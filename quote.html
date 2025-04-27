@@ -1,1 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Quote Generator</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --background-color: #f8f9fa;
+            --text-color: #2c3e50;
+            --transition: all 0.3s ease;
+        }
 
+        [data-theme="dark"] {
+            --primary-color: #ecf0f1;
+            --secondary-color: #1abc9c;
+            --background-color: #2c3e50;
+            --text-color: #ecf0f1;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 2rem;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            transition: var(--transition);
+        }
+
+        .container {
+            max-width: 800px;
+            width: 90%;
+            text-align: center;
+        }
+
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            cursor: pointer;
+            font-size: 1.5rem;
+            color: var(--secondary-color);
+        }
+
+        #quote-container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+            margin: 2rem 0;
+            position: relative;
+            min-height: 250px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        #quote-text {
+            font-size: 1.8rem;
+            line-height: 1.6;
+            margin-bottom: 1.5rem;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: var(--transition);
+        }
+
+        #quote-author {
+            font-style: italic;
+            font-size: 1.2rem;
+            color: var(--secondary-color);
+            opacity: 0;
+            transform: translateY(20px);
+            transition: var(--transition);
+        }
+
+        .controls {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 2rem;
+        }
+
+        button {
+            padding: 0.8rem 1.5rem;
+            font-size: 1.1rem;
+            cursor: pointer;
+            background-color: var(--secondary-color);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .category-filter {
+            margin: 1rem 0;
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .category-btn {
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            background: rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--secondary-color);
+            color: var(--text-color);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .category-btn.active {
+            background: var(--secondary-color);
+            color: white;
+        }
+
+        .history-container {
+            margin-top: 2rem;
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 10px;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: none;
+        }
+
+        .show {
+            opacity: 1 !important;
+            transform: translateY(0) !important;
+        }
+
+        @media (max-width: 768px) {
+            #quote-text {
+                font-size: 1.4rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="theme-toggle" id="theme-toggle">
+        <i class="fas fa-moon"></i>
+    </div>
+
+    <div class="container">
+        <h1>Inspirational Quotes</h1>
+        
+        <div class="category-filter" id="category-filter">
+            <button class="category-btn active" data-category="all">All</button>
+            <button class="category-btn" data-category="motivation">Motivation</button>
+            <button class="category-btn" data-category="success">Success</button>
+            <button class="category-btn" data-category="life">Life</button>
+        </div>
+
+        <div id="quote-container">
+            <div class="loading">
+                <i class="fas fa-spinner fa-spin"></i>
+            </div>
+            <p id="quote-text"></p>
+            <p id="quote-author"></p>
+        </div>
+
+        <div class="controls">
+            <button id="generate-btn">
+                <i class="fas fa-random"></i>
+                New Quote
+            </button>
+            <button id="share-btn">
+                <i class="fas fa-share"></i>
+                Share
+            </button>
+            <button id="speak-btn">
+                <i class="fas fa-volume-up"></i>
+                Speak
+            </button>
+            <button id="copy-btn">
+                <i class="fas fa-copy"></i>
+                Copy
+            </button>
+        </div>
+
+        <div class="history-container">
+            <h3>Quote History</h3>
+            <div id="quote-history"></div>
+        </div>
+    </div>
+
+    <script>
+        // Advanced Features
+        const quotesAPI = 'https://api.quotable.io/quotes/random';
+        let currentCategory = 'all';
+        let quoteHistory = JSON.parse(localStorage.getItem('quoteHistory')) || [];
+
+        // Elements
+        const elements = {
+            quoteText: document.getElementById('quote-text'),
+            quoteAuthor: document.getElementById('quote-author'),
+            generateBtn: document.getElementById('generate-btn'),
+            categoryFilter: document.getElementById('category-filter'),
+            themeToggle: document.getElementById('theme-toggle'),
+            shareBtn: document.getElementById('share-btn'),
+            speakBtn: document.getElementById('speak-btn'),
+            copyBtn: document.getElementById('copy-btn'),
+            loading: document.querySelector('.loading'),
+            quoteHistory: document.getElementById('quote-history')
+        };
+
+        // Theme Toggle
+        elements.themeToggle.addEventListener('click', () => {
+            document.body.classList.toggle('data-theme', 'dark');
+            localStorage.setItem('theme', document.body.classList.contains('data-theme') ? 'dark' : 'light');
+            elements.themeToggle.innerHTML = document.body.classList.contains('data-theme') 
+                ? '<i class="fas fa-sun"></i>' 
+                : '<i class="fas fa-moon"></i>';
+        });
+
+        // Category Filter
+        elements.categoryFilter.addEventListener('click', (e) => {
+            if (e.target.classList.contains('category-btn')) {
+                document.querySelector('.category-btn.active').classList.remove('active');
+                e.target.classList.add('active');
+                currentCategory = e.target.dataset.category;
+                fetchNewQuote();
+            }
+        });
+
+        // Fetch Quote from API
+        async function fetchNewQuote() {
+            try {
+                elements.loading.style.display = 'block';
+                const response = await fetch(`${quotesAPI}?tags=${currentCategory}`);
+                const [quote] = await response.json();
+                
+                elements.quoteText.textContent = `"${quote.content}"`;
+                elements.quoteAuthor.textContent = `- ${quote.author}`;
+                
+                // Add to history
+                quoteHistory.unshift({ 
+                    text: quote.content, 
+                    author: quote.author,
+                    date: new Date().toLocaleString()
+                });
+                if (quoteHistory.length > 5) quoteHistory.pop();
+                localStorage.setItem('quoteHistory', JSON.stringify(quoteHistory));
+                updateHistory();
+
+                // Animation
+                setTimeout(() => {
+                    elements.quoteText.classList.add('show');
+                    elements.quoteAuthor.classList.add('show');
+                    elements.loading.style.display = 'none';
+                }, 100);
+                
+            } catch (error) {
+                console.error('Error fetching quote:', error);
+                elements.loading.style.display = 'none';
+                elements.quoteText.textContent = 'Failed to fetch quote. Please try again.';
+                elements.quoteAuthor.textContent = '';
+            }
+        }
+
+        // Update Quote History
+        function updateHistory() {
+            elements.quoteHistory.innerHTML = quoteHistory
+                .map((q, index) => `
+                    <div class="history-item" style="margin: 0.5rem 0; opacity: ${1 - index * 0.2}">
+                        "${q.text}" - ${q.author} (${q.date})
+                    </div>
+                `)
+                .join('');
+        }
+
+        // Text-to-Speech
+        elements.speakBtn.addEventListener('click', () => {
+            const utterance = new SpeechSynthesisUtterance(
+                `${elements.quoteText.textContent} by ${elements.quoteAuthor.textContent}`
+            );
+            speechSynthesis.speak(utterance);
+        });
+
+        // Copy to Clipboard
+        elements.copyBtn.addEventListener('click', () => {
+            const text = `${elements.quoteText.textContent}\n${elements.quoteAuthor.textContent}`;
+            navigator.clipboard.writeText(text)
+                .then(() => alert('Quote copied to clipboard!'))
+                .catch(err => console.error('Failed to copy:', err));
+        });
+
+        // Share Quote
+        elements.shareBtn.addEventListener('click', () => {
+            if (navigator.share) {
+                navigator.share({
+                    title: 'Inspirational Quote',
+                    text: `${elements.quoteText.textContent} - ${elements.quoteAuthor.textContent}`,
+                    url: window.location.href
+                });
+            } else {
+                alert('Web Share API not supported in your browser');
+            }
+        });
+
+        // Initialize
+        function init() {
+            // Load theme
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.body.classList.toggle('data-theme', savedTheme === 'dark');
+            elements.themeToggle.innerHTML = savedTheme === 'dark' 
+                ? '<i class="fas fa-sun"></i>' 
+                : '<i class="fas fa-moon"></i>';
+
+            // Load first quote
+            fetchNewQuote();
+            updateHistory();
+        }
+
+        // Event Listeners
+        elements.generateBtn.addEventListener('click', fetchNewQuote);
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>
